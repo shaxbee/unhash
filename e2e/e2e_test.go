@@ -20,12 +20,19 @@ func TestUnstructuredHash(t *testing.T) {
 	for filename, obj := range files {
 		filename, obj := filename, obj
 		t.Run(filename, func(t *testing.T) {
-			hash, err := unhash.HashMap(obj.Object, unhash.Config{})
+			v1, err := unhash.HashMap(obj.Object, unhash.Config{})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			t.Log("hash:", hash)
+			v2, err := unhash.HashMap(obj.Object, unhash.Config{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if v1 != v2 {
+				t.Errorf("hash: expected %d, got %d", v1, v2)
+			}
 		})
 	}
 }
@@ -38,8 +45,8 @@ func BenchmarkUnstructuredHash(b *testing.B) {
 
 	for filename, obj := range files {
 		filename, obj := filename, obj
+
 		b.Run(filename, func(b *testing.B) {
-			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				_, err := unhash.HashMap(obj.Object, unhash.Config{})
 				if err != nil {

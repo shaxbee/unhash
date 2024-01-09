@@ -1,0 +1,3 @@
+GOCOVERPKG := github.com/shaxbee/unhash/...
+
+include makefiles/go.mk

@@ -7,7 +7,7 @@ import (
 
 var (
 	DefaultHash     = fnv.New64
-	DefaultMaxDepth = 10
+	DefaultMaxDepth = 20
 )
 
 type Config struct {

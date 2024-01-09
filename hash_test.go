@@ -1,6 +1,11 @@
 package unhash
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+)
 
 func TestHash(t *testing.T) {
 	tests := []struct {
@@ -43,8 +48,6 @@ func TestHash(t *testing.T) {
 				t.Fatal("hash:", err)
 			}
 
-			t.Log("hash:", v)
-
 			expected, err := HashMap(test.data, Config{})
 			switch {
 			case err != nil:
@@ -61,6 +64,51 @@ func TestHash(t *testing.T) {
 				t.Fatal("hash:", err)
 			case v == seeded:
 				t.Errorf("hash: seeded hash should return different value")
+			}
+		})
+	}
+}
+
+func TestHashInvalid(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     map[string]any
+		expected error
+	}{
+		{
+			name: "invalid map value type",
+			data: map[string]any{
+				"map[string]any": map[string]any{
+					"int32": int32(1),
+				},
+			},
+			expected: InvalidTypeError{Type: "int32"},
+		},
+		{
+			name: "invalid slice value type",
+			data: map[string]any{
+				"[]any": []any{int32(1)},
+			},
+			expected: InvalidTypeError{Type: "int32"},
+		},
+		{
+			name: "depth limit",
+			data: map[string]any{
+				"map[string]any": map[string]any{
+					"map[string]any": map[string]any{},
+				},
+			},
+			expected: ErrMaxDepth,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			_, err := HashMap(test.data, Config{
+				MaxDepth: 2,
+			})
+			if diff := cmp.Diff(test.expected, err, cmpopts.EquateErrors()); diff != "" {
+				t.Errorf("hash: %s", diff)
 			}
 		})
 	}

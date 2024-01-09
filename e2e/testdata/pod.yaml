@@ -1,0 +1,249 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    kubectl.kubernetes.io/default-container: etcd
+    prometheus.io/port: "2381"
+    prometheus.io/scrape: "true"
+  creationTimestamp: "2024-01-09T10:17:23Z"
+  labels:
+    app.kubernetes.io/managed-by: etcd-operator
+    etcd.fleet.agoda.com/cluster: etcd-test.etcd
+    etcd.fleet.agoda.com/cluster-hash: 595f569665
+    etcd.fleet.agoda.com/member: etcd-test-dg8vjwx59n
+  name: etcd-test-dg8vjwx59n
+  namespace: etcd
+  ownerReferences:
+  - apiVersion: etcd.fleet.agoda.com/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: EtcdCluster
+    name: etcd-test
+    uid: 1299c8c6-8e68-4a3c-9dc7-8ff3fe253039
+  resourceVersion: "2129"
+  uid: 142530af-7013-47d2-9042-db3fd355089e
+spec:
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              etcd.fleet.agoda.com/cluster: etcd-test.etcd
+          topologyKey: kubernetes.io/hostname
+        weight: 1
+  containers:
+  - command:
+    - etcd
+    - --experimental-initial-corrupt-check=true
+    - --experimental-watch-progress-notify-interval=5s
+    - --data-dir=/var/lib/etcd/data
+    - --quota-backend-bytes=4000000000
+    - --snapshot-count=10000
+    - --auto-compaction-mode=revision
+    - --auto-compaction-retention=1000
+    - --listen-client-urls=https://0.0.0.0:2379
+    - --listen-peer-urls=https://0.0.0.0:2380
+    - --listen-metrics-urls=http://0.0.0.0:2381
+    - --client-cert-auth=true
+    - --trusted-ca-file=/etc/etcd/pki/server/ca.crt
+    - --cert-file=/etc/etcd/pki/server/tls.crt
+    - --key-file=/etc/etcd/pki/server/tls.key
+    - --peer-client-cert-auth=true
+    - --peer-trusted-ca-file=/etc/etcd/pki/peer/ca.crt
+    - --peer-cert-file=/etc/etcd/pki/peer/tls.crt
+    - --peer-key-file=/etc/etcd/pki/peer/tls.key
+    env:
+    - name: ETCD_NAME
+      value: etcd-test-dg8vjwx59n
+    - name: ETCD_ADVERTISE_CLIENT_URLS
+      value: https://etcd-test-dg8vjwx59n.etcd-test.etcd.svc.cluster.local:2379
+    - name: ETCD_INITIAL_CLUSTER
+      value: etcd-test-wq8qqpsbpr=https://etcd-test-wq8qqpsbpr.etcd-test.etcd.svc.cluster.local:2380,etcd-test-tjbvm7cwww=https://etcd-test-tjbvm7cwww.etcd-test.etcd.svc.cluster.local:2380,etcd-test-dg8vjwx59n=https://etcd-test-dg8vjwx59n.etcd-test.etcd.svc.cluster.local:2380
+    - name: ETCD_INITIAL_CLUSTER_STATE
+      value: new
+    - name: ETCD_INITIAL_CLUSTER_TOKEN
+      value: etcd-test
+    - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
+      value: https://etcd-test-dg8vjwx59n.etcd-test.etcd.svc.cluster.local:2380
+    image: images.agodadev.io/quay.io/coreos/etcd:v3.5.7
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 8
+      httpGet:
+        path: /health?serializable=true
+        port: 2381
+        scheme: HTTP
+      periodSeconds: 5
+      successThreshold: 1
+      timeoutSeconds: 15
+    name: etcd
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1G
+      requests:
+        cpu: 500m
+        memory: 512M
+    startupProbe:
+      failureThreshold: 24
+      httpGet:
+        path: /health?serializable=true
+        port: 2381
+        scheme: HTTP
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      successThreshold: 1
+      timeoutSeconds: 15
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/lib/etcd
+      name: data
+    - mountPath: /etc/etcd/pki/server
+      name: server-tls
+      readOnly: true
+    - mountPath: /etc/etcd/pki/peer
+      name: peer-tls
+      readOnly: true
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-dllt4
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  hostname: etcd-test-dg8vjwx59n
+  initContainers:
+  - command:
+    - /bin/sh
+    - -c
+    - |2-
+
+      while ( ! nslookup -type=SRV "${SERVICE}" | grep "${MEMBER}" )
+      do
+          # If TIMEOUT_READY is 0 we should never time out and exit
+          TIMEOUT_READY=$(( TIMEOUT_READY-1 ))
+          if [ $TIMEOUT_READY -eq 0 ];
+          then
+              echo "Timed out waiting for DNS entry"
+              exit 1
+          fi
+          sleep 1
+      done
+    env:
+    - name: SERVICE
+      value: _etcd-server-ssl._tcp.etcd-test.etcd.svc.cluster.local
+    - name: MEMBER
+      value: etcd-test-dg8vjwx59n
+    - name: TIMEOUT_READY
+      value: "120"
+    image: busybox:1.36.0-glibc
+    imagePullPolicy: IfNotPresent
+    name: check-dns-records
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-dllt4
+      readOnly: true
+  nodeName: fleet-control-plane
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: default
+  serviceAccountName: default
+  subdomain: etcd-test
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - emptyDir:
+      sizeLimit: 4G
+    name: data
+  - name: server-tls
+    secret:
+      defaultMode: 420
+      secretName: etcd-test-dg8vjwx59n-server-cert
+  - name: peer-tls
+    secret:
+      defaultMode: 420
+      secretName: etcd-test-dg8vjwx59n-peer-cert
+  - name: kube-api-access-dllt4
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2024-01-09T10:18:10Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2024-01-09T10:18:16Z"
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2024-01-09T10:18:16Z"
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2024-01-09T10:17:23Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: containerd://f934d49b2f09ff20441043702053088eb66e637038d3568f8f06f27a45b1ab7d
+    image: images.agodadev.io/quay.io/coreos/etcd:v3.5.7
+    imageID: images.agodadev.io/quay.io/coreos/etcd@sha256:7238b08a6bad494e84ed1c632a62d39bdeed1f929950a05c1a32b6d4490a0047
+    lastState: {}
+    name: etcd
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2024-01-09T10:18:10Z"
+  hostIP: 172.18.0.2
+  initContainerStatuses:
+  - containerID: containerd://b4347f2083d3cd44aefaaff4daa7fe38ae431816c239e29e09570e64b46b7c0f
+    image: docker.io/library/busybox:1.36.0-glibc
+    imageID: docker.io/library/busybox@sha256:a8a6713398d1efbb5fdbf0c2d5c982a79466b36045089b64cba4bd9a8ba84f88
+    lastState: {}
+    name: check-dns-records
+    ready: true
+    restartCount: 0
+    state:
+      terminated:
+        containerID: containerd://b4347f2083d3cd44aefaaff4daa7fe38ae431816c239e29e09570e64b46b7c0f
+        exitCode: 0
+        finishedAt: "2024-01-09T10:18:09Z"
+        reason: Completed
+        startedAt: "2024-01-09T10:17:40Z"
+  phase: Running
+  podIP: 10.244.0.12
+  podIPs:
+  - ip: 10.244.0.12
+  qosClass: Burstable
+  startTime: "2024-01-09T10:17:23Z"
