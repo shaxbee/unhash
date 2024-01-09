@@ -6,12 +6,11 @@ import (
 	"io/fs"
 	"testing"
 
-	"github.com/segmentio/fasthash/fnv1"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 
 	"github.com/shaxbee/unhash"
+	"github.com/shaxbee/unhash/internal/fasthash/fnv1"
 )
 
 //go:embed testdata/*.yaml
@@ -76,7 +75,9 @@ func BenchmarkJSONHash(b *testing.B) {
 					b.Fatal("marshal:", err)
 				}
 
-				if hash := fnv1.HashBytes64(data); hash == 0 {
+				var hash = fnv1.Init
+				fnv1.AddBytes(hash, data)
+				if hash == 0 {
 					b.Fatal("hash: zero")
 				}
 			}

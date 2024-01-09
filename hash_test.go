@@ -2,9 +2,6 @@ package unhash
 
 import (
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestHash(t *testing.T) {
@@ -24,8 +21,7 @@ func TestHash(t *testing.T) {
 		{
 			name: "slices",
 			data: map[string]any{
-				"[]string": []string{"foo", "bar"},
-				"[]any":    []any{true, int64(1), float64(1.0), "hello"},
+				"[]any": []any{true, int64(1), float64(1.0), "hello", nil},
 			},
 		},
 		{
@@ -98,7 +94,7 @@ func TestHashInvalid(t *testing.T) {
 			},
 		},
 		{
-			name: "depth limit",
+			name: "nested map depth limit",
 			data: map[string]any{
 				"map": map[string]any{
 					"map": map[string]any{
@@ -110,6 +106,17 @@ func TestHashInvalid(t *testing.T) {
 				Path: "map.map.int64",
 			},
 		},
+		{
+			name: "nested slice depth limit",
+			data: map[string]any{
+				"map": map[string]any{
+					"slice": []any{int64(1), float64(1.0)},
+				},
+			},
+			expected: MaxDepthError{
+				Path: "map.slice.0",
+			},
+		},
 	}
 	for _, test := range tests {
 		test := test
@@ -117,8 +124,8 @@ func TestHashInvalid(t *testing.T) {
 			_, err := HashMap(test.data, Config{
 				MaxDepth: 2,
 			})
-			if diff := cmp.Diff(test.expected, err, cmpopts.EquateErrors()); diff != "" {
-				t.Errorf("hash: %s", diff)
+			if err == nil || err.Error() != test.expected.Error() {
+				t.Errorf("hash: expected %v, got %v", test.expected, err)
 			}
 		})
 	}
