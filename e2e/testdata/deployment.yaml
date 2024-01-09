@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etcd-operator
+spec:
+  template:
+    metadata:
+      labels:
+        logging.monitoring.agoda.is/enabled: "true"
+        attribute.monitoring.agoda.is/service.name: "etcd-operator"
+      annotations:
+        kubectl.kubernetes.io/default-container: operator
+    spec:
+      serviceAccountName: etcd-operator
+      containers:
+        - name: operator
+          image: images.agodadev.io/fleet/etcd-operator
+          args: ["--leader-elect"]
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          envFrom: []
+          volumeMounts: []
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 512m
+              memory: 2G
+            requests:
+              cpu: 256m
+              memory: 256Mi
+      volumes: []
