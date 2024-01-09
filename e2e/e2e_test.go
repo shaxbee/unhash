@@ -2,8 +2,11 @@ package e2e
 
 import (
 	"embed"
+	"encoding/json"
 	"io/fs"
 	"testing"
+
+	"github.com/segmentio/fasthash/fnv1"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -51,6 +54,30 @@ func BenchmarkUnstructuredHash(b *testing.B) {
 				_, err := unhash.HashMap(obj.Object, unhash.Config{})
 				if err != nil {
 					b.Fatal(i, err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkJSONHash(b *testing.B) {
+	files := loadTestData(b, testdata, "testdata/*.yaml")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for filename, obj := range files {
+		filename, obj := filename, obj
+
+		b.Run(filename, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				data, err := json.Marshal(obj)
+				if err != nil {
+					b.Fatal("marshal:", err)
+				}
+
+				if hash := fnv1.HashBytes64(data); hash == 0 {
+					b.Fatal("hash: zero")
 				}
 			}
 		})

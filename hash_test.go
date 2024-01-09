@@ -78,27 +78,37 @@ func TestHashInvalid(t *testing.T) {
 		{
 			name: "invalid map value type",
 			data: map[string]any{
-				"map[string]any": map[string]any{
+				"map": map[string]any{
 					"int32": int32(1),
 				},
 			},
-			expected: InvalidTypeError{Type: "int32"},
+			expected: InvalidTypeError{
+				Type: "int32",
+				Path: "map.int32",
+			},
 		},
 		{
 			name: "invalid slice value type",
 			data: map[string]any{
 				"[]any": []any{int32(1)},
 			},
-			expected: InvalidTypeError{Type: "int32"},
+			expected: InvalidTypeError{
+				Type: "int32",
+				Path: "[]any.0",
+			},
 		},
 		{
 			name: "depth limit",
 			data: map[string]any{
-				"map[string]any": map[string]any{
-					"map[string]any": map[string]any{},
+				"map": map[string]any{
+					"map": map[string]any{
+						"int64": int64(1),
+					},
 				},
 			},
-			expected: ErrMaxDepth,
+			expected: MaxDepthError{
+				Path: "map.map.int64",
+			},
 		},
 	}
 	for _, test := range tests {

@@ -1,18 +1,25 @@
 package unhash
 
 import (
-	"encoding/binary"
 	"fmt"
-	"hash"
-	"hash/fnv"
 	"math"
 	"reflect"
-	"unsafe"
+	"strconv"
+	"strings"
+
+	"github.com/segmentio/fasthash/fnv1"
 )
 
-var ErrMaxDepth = fmt.Errorf("unhash: max depth reached")
+type MaxDepthError struct {
+	Path string
+}
+
+func (e MaxDepthError) Error() string {
+	return fmt.Sprintf("unhash: max depth reached at %s", e.Path)
+}
 
 type InvalidTypeError struct {
+	Path string
 	Type string
 }
 
@@ -23,117 +30,153 @@ func (e InvalidTypeError) Error() string {
 func HashMap(data map[string]any, config Config) (uint64, error) {
 	config = ConfigDefault(config)
 
-	res, err := visitMap(data, 0, config)
+	v := visitor{
+		config: config,
+	}
+
+	res, err := v.visitMap(data)
 	if err != nil {
 		return 0, err
 	}
 
-	h := config.Hash()
-	if config.Seed != 0 {
-		writeUint64(h, config.Seed)
-	}
-	writeUint64(h, res)
+	var hash = config.Seed
+	fnv1.AddUint64(hash, res)
 
-	return h.Sum64(), nil
+	return hash, nil
 }
 
-func visitMap(data map[string]any, depth int, config Config) (uint64, error) {
-	depth++
-	if depth > config.MaxDepth {
-		return 0, ErrMaxDepth
-	}
+type visitor struct {
+	path   []segment
+	config Config
+}
 
-	h := config.Hash()
+type segment struct {
+	str string
+	idx int
+}
+
+func (v *visitor) visitMap(data map[string]any) (uint64, error) {
 	var sum uint64
-	for k, v := range data {
-		h.Reset()
+	for key, value := range data {
+		if err := v.push(segment{str: key}); err != nil {
+			return 0, err
+		}
 
-		res, err := visitValue(v, depth, config)
+		res, err := v.visitValue(value)
 		if err != nil {
 			return 0, err
 		}
 
-		writeString(h, k)
-		writeUint64(h, res)
+		var hash uint64
+		fnv1.AddString64(hash, key)
+		fnv1.AddUint64(hash, res)
 
-		sum ^= h.Sum64()
+		sum ^= hash
+
+		v.pop()
 	}
 
-	h.Reset()
-	writeUint64(h, sum)
-
-	return h.Sum64(), nil
+	return fnv1.HashUint64(sum), nil
 }
 
-func visitSlice(data []any, depth int, config Config) (uint64, error) {
-	depth++
-	if depth > config.MaxDepth {
-		return 0, ErrMaxDepth
-	}
+func (v *visitor) visitSlice(data []any) (uint64, error) {
+	var hash uint64
+	for idx, value := range data {
+		if err := v.push(segment{idx: idx}); err != nil {
+			return 0, err
+		}
 
-	h := config.Hash()
-	for _, v := range data {
-		res, err := visitValue(v, depth, config)
+		res, err := v.visitValue(value)
 		if err != nil {
 			return 0, err
 		}
 
-		writeUint64(h, res)
+		fnv1.AddUint64(hash, res)
+
+		v.pop()
 	}
 
-	return h.Sum64(), nil
+	return hash, nil
 }
 
-func visitValue(data any, depth int, config Config) (uint64, error) {
+func (v *visitor) visitValue(data any) (uint64, error) {
 	if data == nil {
 		return uint64(0), nil
 	}
 
-	h := fnv.New64()
-
+	var hash uint64
 	switch tv := data.(type) {
 	case string:
-		writeString(h, tv)
+		fnv1.AddString64(hash, tv)
 	case int64:
-		writeUint64(h, uint64(tv))
+		fnv1.AddUint64(hash, uint64(tv))
 	case float64:
-		writeUint64(h, math.Float64bits(tv))
+		fnv1.AddUint64(hash, math.Float64bits(tv))
 	case bool:
 		var bv uint64
 		if tv {
 			bv = 1
 		}
-		writeUint64(h, bv)
+		fnv1.AddUint64(hash, bv)
 	case []string:
 		for _, s := range tv {
-			writeString(h, s)
+			fnv1.AddString64(hash, s)
 		}
 	case []any:
-		res, err := visitSlice(tv, depth, config)
+		res, err := v.visitSlice(tv)
 		if err != nil {
 			return 0, err
 		}
-		writeUint64(h, res)
+		fnv1.AddUint64(hash, res)
 	case map[string]any:
-		res, err := visitMap(tv, depth, config)
+		res, err := v.visitMap(tv)
 		if err != nil {
 			return 0, err
 		}
-		writeUint64(h, res)
+		fnv1.AddUint64(hash, res)
 	default:
 		tpe := reflect.TypeOf(data).String()
-		return 0, InvalidTypeError{Type: tpe}
+		return 0, InvalidTypeError{
+			Path: v.current(),
+			Type: tpe,
+		}
 	}
 
-	return h.Sum64(), nil
+	return hash, nil
 }
 
-func writeString(w hash.Hash64, data string) {
-	_, _ = w.Write(unsafe.Slice(unsafe.StringData(data), len(data)))
+func (v *visitor) current() string {
+	var path []string
+	for _, seg := range v.path {
+		path = append(path, seg.String())
+	}
+
+	return strings.Join(path, ".")
 }
 
-func writeUint64(w hash.Hash64, v uint64) {
-	b := [8]byte{}
-	binary.NativeEndian.PutUint64(b[:], v)
-	_, _ = w.Write(b[:])
+func (v *visitor) pop() {
+	if len(v.path) == 0 {
+		panic("unhash: empty path")
+	}
+
+	v.path = v.path[:len(v.path)-1]
+}
+
+func (v *visitor) push(seg segment) error {
+	v.path = append(v.path, seg)
+	if len(v.path) > v.config.MaxDepth {
+		return MaxDepthError{
+			Path: v.current(),
+		}
+	}
+
+	return nil
+}
+
+func (s segment) String() string {
+	if s.str != "" {
+		return s.str
+	}
+
+	return strconv.Itoa(s.idx)
 }
