@@ -76,7 +76,7 @@ func BenchmarkJSONHash(b *testing.B) {
 				}
 
 				var hash = fnv1.Init
-				fnv1.AddBytes(hash, data)
+				hash = fnv1.AddBytes(hash, data)
 				if hash == 0 {
 					b.Fatal("hash: zero")
 				}

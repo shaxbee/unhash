@@ -32,8 +32,8 @@ func (v *visitor) visitMap(data map[string]any) (uint64, error) {
 		}
 
 		var hash = fnv1.Init
-		fnv1.AddString(hash, key)
-		fnv1.AddUint64(hash, res)
+		hash = fnv1.AddString(hash, key)
+		hash = fnv1.AddUint64(hash, res)
 
 		sum ^= hash
 
@@ -56,7 +56,7 @@ func (v *visitor) visitSlice(data []any) (uint64, error) {
 			return 0, err
 		}
 
-		fnv1.AddUint64(hash, res)
+		hash = fnv1.AddUint64(hash, res)
 
 		v.pop()
 	}
@@ -72,29 +72,29 @@ func (v *visitor) visitValue(data any) (uint64, error) {
 	var hash = fnv1.Init
 	switch tv := data.(type) {
 	case string:
-		fnv1.AddString(hash, tv)
+		hash = fnv1.AddString(hash, tv)
 	case int64:
-		fnv1.AddUint64(hash, uint64(tv))
+		hash = fnv1.AddUint64(hash, uint64(tv))
 	case float64:
-		fnv1.AddUint64(hash, math.Float64bits(tv))
+		hash = fnv1.AddUint64(hash, math.Float64bits(tv))
 	case bool:
 		var bv uint64
 		if tv {
 			bv = 1
 		}
-		fnv1.AddUint64(hash, bv)
+		hash = fnv1.AddUint64(hash, bv)
 	case []any:
 		res, err := v.visitSlice(tv)
 		if err != nil {
 			return 0, err
 		}
-		fnv1.AddUint64(hash, res)
+		hash = fnv1.AddUint64(hash, res)
 	case map[string]any:
 		res, err := v.visitMap(tv)
 		if err != nil {
 			return 0, err
 		}
-		fnv1.AddUint64(hash, res)
+		hash = fnv1.AddUint64(hash, res)
 	default:
 		tpe := reflect.TypeOf(data).String()
 		return 0, InvalidTypeError{
@@ -121,7 +121,7 @@ func (v *visitor) pop() {
 
 func (v *visitor) push(seg segment) error {
 	v.path = append(v.path, seg)
-	if len(v.path) > v.config.MaxDepth {
+	if v.config.MaxDepth > 0 && len(v.path) > v.config.MaxDepth {
 		return MaxDepthError{
 			Path: v.current(),
 		}

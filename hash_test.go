@@ -6,8 +6,9 @@ import (
 
 func TestHash(t *testing.T) {
 	tests := []struct {
-		name string
-		data map[string]any
+		name     string
+		data     map[string]any
+		mutation func(map[string]any)
 	}{
 		{
 			name: "primitive types",
@@ -17,11 +18,17 @@ func TestHash(t *testing.T) {
 				"float64": float64(1.0),
 				"string":  "hello",
 			},
+			mutation: func(data map[string]any) {
+				data["bool"] = false
+			},
 		},
 		{
 			name: "slices",
 			data: map[string]any{
 				"[]any": []any{true, int64(1), float64(1.0), "hello", nil},
+			},
+			mutation: func(data map[string]any) {
+				data["[]any"] = append(data["[]any"].([]any), "world")
 			},
 		},
 		{
@@ -34,32 +41,46 @@ func TestHash(t *testing.T) {
 					"string":  "hello",
 				},
 			},
+			mutation: func(data map[string]any) {
+				data = data["map[string]any"].(map[string]any)
+				data["bool"] = false
+			},
 		},
 	}
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			v, err := HashMap(test.data, Config{})
+			expected, err := HashMap(test.data, Config{})
 			if err != nil {
 				t.Fatal("hash:", err)
 			}
 
-			expected, err := HashMap(test.data, Config{})
+			hash, err := HashMap(test.data, Config{})
 			switch {
 			case err != nil:
 				t.Fatal("hash:", err)
-			case v != expected:
-				t.Errorf("hash: expected %d, got %d", expected, v)
+			case hash != expected:
+				t.Errorf("hash: expected %d, got %d", expected, hash)
 			}
 
-			seeded, err := HashMap(test.data, Config{
+			hash, err = HashMap(test.data, Config{
 				Seed: 42,
 			})
 			switch {
 			case err != nil:
 				t.Fatal("hash:", err)
-			case v == seeded:
+			case hash == expected:
 				t.Errorf("hash: seeded hash should return different value")
+			}
+
+			test.mutation(test.data)
+
+			hash, err = HashMap(test.data, Config{})
+			switch {
+			case err != nil:
+				t.Fatal("hash:", err)
+			case hash == expected:
+				t.Errorf("hash: mutated data should return different value")
 			}
 		})
 	}
