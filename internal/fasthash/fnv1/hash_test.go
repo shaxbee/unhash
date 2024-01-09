@@ -1,5 +1,3 @@
-// Implementation from https://github.com/segmentio/fasthash
-
 package fnv1
 
 import (
@@ -9,7 +7,7 @@ import (
 )
 
 func TestAddString(t *testing.T) {
-	for _, s := range referenceStrings {
+	for _, s := range testdata {
 		reference := fnv.New64()
 		_, _ = reference.Write([]byte(s))
 		expected := reference.Sum64()
@@ -21,8 +19,17 @@ func TestAddString(t *testing.T) {
 	}
 }
 
+var testdata = []string{
+	"",
+	"A",
+	"hey",
+	"Hello World!",
+	"DAB45194-42CC-4106-AB9F-2447FA4D35C2",
+	"你好吗",
+}
+
 func TestAddBytes(t *testing.T) {
-	for _, s := range referenceStrings {
+	for _, s := range testdata {
 		reference := fnv.New64()
 		_, _ = reference.Write([]byte(s))
 		expected := reference.Sum64()
@@ -45,13 +52,4 @@ func TestAddUint64(t *testing.T) {
 	if sum != expected {
 		t.Errorf("invalid hash: expected %x but got %x", expected, sum)
 	}
-}
-
-var referenceStrings = []string{
-	"",
-	"A",
-	"hey",
-	"Hello World!",
-	"DAB45194-42CC-4106-AB9F-2447FA4D35C2",
-	"你好吗",
 }

@@ -38,6 +38,9 @@ func (e InvalidTypeError) Error() string {
 
 // HashMap computes a hash of unstructured object.
 //
+// Object assumes k8s serializer format defined in k8s.io/apimachinery/pkg/runtime/serializer
+// and https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
+//
 // Supported values:
 //   - string
 //   - int64

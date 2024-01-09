@@ -3,6 +3,7 @@ package e2e
 import (
 	"embed"
 	"encoding/json"
+	"hash/fnv"
 	"io/fs"
 	"testing"
 
@@ -10,7 +11,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/shaxbee/unhash"
-	"github.com/shaxbee/unhash/internal/fasthash/fnv1"
 )
 
 //go:embed testdata/*.yaml
@@ -75,11 +75,8 @@ func BenchmarkJSONHash(b *testing.B) {
 					b.Fatal("marshal:", err)
 				}
 
-				var hash = fnv1.Init
-				hash = fnv1.AddBytes(hash, data)
-				if hash == 0 {
-					b.Fatal("hash: zero")
-				}
+				hash := fnv.New64()
+				_, _ = hash.Write(data)
 			}
 		})
 	}

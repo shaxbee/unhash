@@ -22,7 +22,7 @@ type segment struct {
 func (v *visitor) visitMap(data map[string]any) (uint64, error) {
 	var sum uint64
 	for key, value := range data {
-		if err := v.push(segment{str: key}); err != nil {
+		if err := v.push(segment{str: key, idx: -1}); err != nil {
 			return 0, err
 		}
 
@@ -46,6 +46,7 @@ func (v *visitor) visitMap(data map[string]any) (uint64, error) {
 
 func (v *visitor) visitSlice(data []any) (uint64, error) {
 	var hash = fnv1.Init
+
 	for idx, value := range data {
 		if err := v.push(segment{idx: idx}); err != nil {
 			return 0, err
@@ -65,36 +66,37 @@ func (v *visitor) visitSlice(data []any) (uint64, error) {
 }
 
 func (v *visitor) visitValue(data any) (uint64, error) {
+	var hash = fnv1.Init
+
 	if data == nil {
-		return fnv1.Init, nil
+		return hash, nil
 	}
 
-	var hash = fnv1.Init
-	switch tv := data.(type) {
+	switch value := data.(type) {
 	case string:
-		hash = fnv1.AddString(hash, tv)
+		hash = fnv1.AddString(hash, value)
 	case int64:
-		hash = fnv1.AddUint64(hash, uint64(tv))
+		hash = fnv1.AddUint64(hash, uint64(value))
 	case float64:
-		hash = fnv1.AddUint64(hash, math.Float64bits(tv))
+		hash = fnv1.AddUint64(hash, math.Float64bits(value))
 	case bool:
 		var bv uint64
-		if tv {
+		if value {
 			bv = 1
 		}
 		hash = fnv1.AddUint64(hash, bv)
 	case []any:
-		res, err := v.visitSlice(tv)
+		vhash, err := v.visitSlice(value)
 		if err != nil {
 			return 0, err
 		}
-		hash = fnv1.AddUint64(hash, res)
+		hash = fnv1.AddUint64(hash, vhash)
 	case map[string]any:
-		res, err := v.visitMap(tv)
+		vhash, err := v.visitMap(value)
 		if err != nil {
 			return 0, err
 		}
-		hash = fnv1.AddUint64(hash, res)
+		hash = fnv1.AddUint64(hash, vhash)
 	default:
 		tpe := reflect.TypeOf(data).String()
 		return 0, InvalidTypeError{
@@ -131,7 +133,7 @@ func (v *visitor) push(seg segment) error {
 }
 
 func (s segment) String() string {
-	if s.str != "" {
+	if s.idx == -1 {
 		return s.str
 	}
 
