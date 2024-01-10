@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"hash/fnv"
 	"io/fs"
+	"path"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -17,17 +18,17 @@ import (
 var testdata embed.FS
 
 func TestUnstructuredHash(t *testing.T) {
-	files := loadTestData(t, testdata, "testdata/*.yaml")
+	objs := readObjects(t)
 
-	for filename, obj := range files {
-		filename, obj := filename, obj
-		t.Run(filename, func(t *testing.T) {
-			v1, err := unhash.HashMap(obj.Object, unhash.Config{})
+	for _, obj := range objs {
+		obj := obj
+		t.Run(obj.name, func(t *testing.T) {
+			v1, err := unhash.HashMap(obj.data, unhash.Config{})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			v2, err := unhash.HashMap(obj.Object, unhash.Config{})
+			v2, err := unhash.HashMap(obj.data, unhash.Config{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -39,38 +40,17 @@ func TestUnstructuredHash(t *testing.T) {
 	}
 }
 
-func BenchmarkUnstructuredHash(b *testing.B) {
-	files := loadTestData(b, testdata, "testdata/*.yaml")
+func BenchmarkHash(b *testing.B) {
+	objs := readObjects(b)
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for filename, obj := range files {
-		filename, obj := filename, obj
-
-		b.Run(filename, func(b *testing.B) {
+	for _, obj := range objs {
+		obj := obj
+		b.Run(path.Join(obj.name, "algo=json"), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, err := unhash.HashMap(obj.Object, unhash.Config{})
-				if err != nil {
-					b.Fatal(i, err)
-				}
-			}
-		})
-	}
-}
-
-func BenchmarkJSONHash(b *testing.B) {
-	files := loadTestData(b, testdata, "testdata/*.yaml")
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for filename, obj := range files {
-		filename, obj := filename, obj
-
-		b.Run(filename, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				data, err := json.Marshal(obj)
+				data, err := json.Marshal(obj.data)
 				if err != nil {
 					b.Fatal("marshal:", err)
 				}
@@ -80,16 +60,38 @@ func BenchmarkJSONHash(b *testing.B) {
 			}
 		})
 	}
+
+	for _, obj := range objs {
+		obj := obj
+		b.Run(path.Join(obj.name, "algo=unstructured"), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_, err := unhash.HashMap(obj.data, unhash.Config{})
+				if err != nil {
+					b.Fatal(i, err)
+				}
+			}
+		})
+	}
 }
 
-func loadTestData(t testing.TB, fsys fs.FS, pattern string) map[string]*unstructured.Unstructured {
-	files, err := fs.Glob(fsys, pattern)
+type object struct {
+	name string
+	data map[string]any
+}
+
+func readObjects(t testing.TB) []object {
+	fsys, err := fs.Sub(testdata, "testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	res := make(map[string]*unstructured.Unstructured, len(files))
-	for _, filename := range files {
+	files, err := fs.Glob(fsys, "*.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res := make([]object, len(files))
+	for i, filename := range files {
 		data, err := fs.ReadFile(fsys, filename)
 		if err != nil {
 			t.Fatal(err)
@@ -100,7 +102,10 @@ func loadTestData(t testing.TB, fsys fs.FS, pattern string) map[string]*unstruct
 			t.Fatalf("unmarshal %q: %v", filename, err)
 		}
 
-		res[filename] = obj
+		res[i] = object{
+			name: filename,
+			data: obj.Object,
+		}
 	}
 
 	return res

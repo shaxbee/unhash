@@ -2,9 +2,10 @@ package unhash
 
 import (
 	"math"
+	"net/url"
+	"path"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/shaxbee/unhash/internal/fasthash/fnv1"
 )
@@ -109,12 +110,12 @@ func (v *visitor) visitValue(data any) (uint64, error) {
 }
 
 func (v *visitor) current() string {
-	var path []string
+	var elems []string
 	for _, seg := range v.path {
-		path = append(path, seg.String())
+		elems = append(elems, seg.String())
 	}
 
-	return strings.Join(path, ".")
+	return path.Join(elems...)
 }
 
 func (v *visitor) pop() {
@@ -134,7 +135,7 @@ func (v *visitor) push(seg segment) error {
 
 func (s segment) String() string {
 	if s.idx == -1 {
-		return s.str
+		return url.PathEscape(s.str)
 	}
 
 	return strconv.Itoa(s.idx)

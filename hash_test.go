@@ -73,7 +73,9 @@ func TestHash(t *testing.T) {
 				t.Errorf("hash: seeded hash should return different value")
 			}
 
-			test.mutation(test.data)
+			if test.mutation != nil {
+				test.mutation(test.data)
+			}
 
 			hash, err = HashMap(test.data, Config{})
 			switch {
@@ -101,7 +103,7 @@ func TestHashInvalid(t *testing.T) {
 			},
 			expected: InvalidTypeError{
 				Type: "int32",
-				Path: "map.int32",
+				Path: "map/int32",
 			},
 		},
 		{
@@ -111,7 +113,7 @@ func TestHashInvalid(t *testing.T) {
 			},
 			expected: InvalidTypeError{
 				Type: "int32",
-				Path: "[]any.0",
+				Path: "[]any/0",
 			},
 		},
 		{
@@ -124,7 +126,7 @@ func TestHashInvalid(t *testing.T) {
 				},
 			},
 			expected: MaxDepthError{
-				Path: "map.map.int64",
+				Path: "map/map/int64",
 			},
 		},
 		{
@@ -135,7 +137,7 @@ func TestHashInvalid(t *testing.T) {
 				},
 			},
 			expected: MaxDepthError{
-				Path: "map.slice.0",
+				Path: "map/slice/0",
 			},
 		},
 	}
