@@ -59,10 +59,6 @@ func BenchmarkHash(b *testing.B) {
 				_, _ = hash.Write(data)
 			}
 		})
-	}
-
-	for _, obj := range objs {
-		obj := obj
 		b.Run(path.Join(obj.name, "algo=unstructured"), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				_, err := unhash.HashMap(obj.data, unhash.Config{})
