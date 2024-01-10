@@ -23,11 +23,7 @@ type segment struct {
 func (v *visitor) visitMap(data map[string]any) (uint64, error) {
 	var sum uint64
 	for key, value := range data {
-		if err := v.push(segment{str: key, idx: -1}); err != nil {
-			return 0, err
-		}
-
-		res, err := v.visitValue(value)
+		res, err := v.visit(segment{str: key, idx: -1}, value)
 		if err != nil {
 			return 0, err
 		}
@@ -37,8 +33,6 @@ func (v *visitor) visitMap(data map[string]any) (uint64, error) {
 		hash = fnv1.AddUint64(hash, res)
 
 		sum ^= hash
-
-		v.pop()
 	}
 
 	var hash = fnv1.Init
@@ -49,18 +43,12 @@ func (v *visitor) visitSlice(data []any) (uint64, error) {
 	var hash = fnv1.Init
 
 	for idx, value := range data {
-		if err := v.push(segment{idx: idx}); err != nil {
-			return 0, err
-		}
-
-		res, err := v.visitValue(value)
+		res, err := v.visit(segment{idx: idx}, value)
 		if err != nil {
 			return 0, err
 		}
 
 		hash = fnv1.AddUint64(hash, res)
-
-		v.pop()
 	}
 
 	return hash, nil
@@ -118,19 +106,19 @@ func (v *visitor) current() string {
 	return path.Join(elems...)
 }
 
-func (v *visitor) pop() {
-	v.path = v.path[:len(v.path)-1]
-}
-
-func (v *visitor) push(seg segment) error {
+func (v *visitor) visit(seg segment, value any) (uint64, error) {
 	v.path = append(v.path, seg)
 	if v.config.MaxDepth > 0 && len(v.path) > v.config.MaxDepth {
-		return MaxDepthError{
+		return 0, MaxDepthError{
 			Path: v.current(),
 		}
 	}
 
-	return nil
+	hash, err := v.visitValue(value)
+
+	v.path = v.path[:len(v.path)-1]
+
+	return hash, err
 }
 
 func (s segment) String() string {
