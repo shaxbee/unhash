@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"hash/fnv"
 
-	"github.com/shaxbee/unhash/internal/fasthash/fnv1"
+	"github.com/shaxbee/unhash/internal/fnv1"
 )
 
 var (

@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/shaxbee/unhash/internal/fasthash/fnv1"
+	"github.com/shaxbee/unhash/internal/fnv1"
 )
 
 type visitor struct {
