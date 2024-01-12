@@ -38,10 +38,15 @@ func (e InvalidTypeError) Error() string {
 
 // HashMap computes a hash of unstructured object.
 //
-// Object assumes k8s serializer format defined in k8s.io/apimachinery/pkg/runtime/serializer
-// and https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
+// Object assumes k8s serializer format defined in [runtime/serializer] and [unstructured].
 //
-// Supported values:
+// Example: [github.com/shaxbee/unhash/e2e.ExampleHashMap]
+//
+// [runtime/serializer]: [https://pkg.go.dev/k8s.io/apimachinery/pkg/runtime/serializer]
+// [unstructured]: [https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured]
+//
+// # Supported values
+//
 //   - string
 //   - int64
 //   - float64
